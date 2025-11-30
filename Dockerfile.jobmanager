@@ -1,0 +1,31 @@
+FROM flink:1.20.0-scala_2.12-java11
+
+# Switch to root to install dependencies
+USER root
+
+# Install Python 3 + pip + build tools + JDK headers (for pemja)
+RUN apt-get update -y && \
+    apt-get install -y python3 python3-pip build-essential gcc g++ openjdk-11-jdk wget && \
+    ln -sf /usr/bin/python3 /usr/bin/python && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Fix missing JDK include directory required by pemja
+RUN for JDK_PATH in /usr/lib/jvm/java-11-openjdk-*; do \
+        if [ -d "$JDK_PATH/include" ] && [ ! -d "/opt/java/openjdk/include" ]; then \
+            ln -sf "$JDK_PATH/include" /opt/java/openjdk/include; \
+        fi; \
+    done
+
+# Install PyFlink (must match Flink version)
+RUN pip3 install --no-cache-dir apache-flink==1.20.0
+
+# Add Kafka SQL connector and JSON format JARs (compatible with Flink 1.20.0)
+RUN mkdir -p /opt/flink/lib && \
+    wget -q -O /opt/flink/lib/flink-sql-connector-kafka-3.3.0-1.20.jar \
+      https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.3.0-1.20/flink-sql-connector-kafka-3.3.0-1.20.jar && \
+    wget -q -O /opt/flink/lib/flink-json-1.20.0.jar \
+      https://repo1.maven.org/maven2/org/apache/flink/flink-json/1.20.0/flink-json-1.20.0.jar && \
+    chown -R flink:flink /opt/flink/lib
+
+# Back to flink user
+USER flink

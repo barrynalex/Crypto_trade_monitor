@@ -1,0 +1,30 @@
+# Environment / virtualenvs
+ENV/
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# Logs / data
+*.log
+kafka-data/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+

@@ -1,0 +1,4 @@
+# Python dependencies
+confluent-kafka>=2.4.0
+websocket-client>=1.7.0
+
