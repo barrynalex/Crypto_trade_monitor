@@ -21,32 +21,38 @@ resource "aws_key_pair" "deployer" {
 }
 
 # --- 3. (新) 設定警衛 (Security Group) ---
-resource "aws_security_group" "allow_ssh_web" {
-  name        = "allow_ssh_web"
-  description = "Allow SSH and HTTP traffic"
+resource "aws_security_group" "allow_kafka_flink" {
+  name        = "allow_kafka_flink"
+  description = "Allow SSH, HTTP, Kafka, Flink"
 
-  # 允許 SSH (Port 22) - 讓您可以登入
+  # SSH
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # 0.0.0.0/0 代表允許全世界連入 (練習方便，正式環境建議鎖 IP)
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 允許 HTTP (Port 80) - 假設未來要架網站
+  # Flink Web UI
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 8081
+    to_port     = 8081
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # 允許所有外連流量 (Egress) - 讓伺服器可以上網更新軟體
-  # 如果沒加這段，伺服器會變成斷網狀態
+  # Kafka Broker (外部連線用)
+  ingress {
+    from_port   = 9092
+    to_port     = 9092
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1" # -1 代表所有協定
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -54,21 +60,24 @@ resource "aws_security_group" "allow_ssh_web" {
 # --- 4. 建立伺服器 (並綁定上面的鑰匙和警衛) ---
 resource "aws_instance" "my_server" {
   ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t3.micro"
+  instance_type = "t3.medium" # 強烈建議！t3.micro 記憶體太小跑不動 Java (Kafka+Flink)
+  
+  key_name      = aws_key_pair.deployer.key_name
+  vpc_security_group_ids = [aws_security_group.allow_kafka_flink.id]
 
-  # 綁定鑰匙
-  key_name = aws_key_pair.deployer.key_name
-
-  # 綁定 Security Group (注意這裡是用 ID)
-  vpc_security_group_ids = [aws_security_group.allow_ssh_web.id]
+  # 讀取新的腳本
+  user_data = file("${path.module}/scripts/deploy_aws.sh")
+  user_data_replace_on_change = true 
 
   tags = {
-    Name = "My-Level2-Server"
+    Name = "Kafka-Flink-Box"
   }
 }
 
-# --- 5. (新) Output: 告訴我 IP 是多少 ---
-output "instance_public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_instance.my_server.public_ip
+output "flink_ui" {
+  value = "http://${aws_instance.my_server.public_ip}:8081"
+}
+
+output "kafka_broker" {
+  value = "${aws_instance.my_server.public_ip}:9092"
 }
